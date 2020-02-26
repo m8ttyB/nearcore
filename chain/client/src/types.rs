@@ -11,11 +11,11 @@ use near_network::PeerInfo;
 use near_primitives::hash::CryptoHash;
 use near_primitives::sharding::ChunkHash;
 use near_primitives::types::{
-    AccountId, BlockHeight, MaybeBlockId, ShardId, StateChanges, StateChangesRequest,
+    AccountId, BlockHeight, BlockId, MaybeBlockId, ShardId, StateChanges, StateChangesRequest,
 };
 use near_primitives::utils::generate_random_string;
 use near_primitives::views::{
-    BlockView, ChunkView, EpochValidatorInfo, FinalExecutionOutcomeView, GasPriceView,
+    BlockView, ChunkView, EpochValidatorInfo, FinalExecutionOutcomeView, Finality, GasPriceView,
     LightClientBlockView, QueryRequest, QueryResponse,
 };
 pub use near_primitives::views::{StatusResponse, StatusSyncInfo};
@@ -143,9 +143,8 @@ impl SyncStatus {
 
 /// Actor message requesting block by id or hash.
 pub enum GetBlock {
-    Best,
-    Height(BlockHeight),
-    Hash(CryptoHash),
+    BlockId(BlockId),
+    Finality(Finality),
 }
 
 impl Message for GetBlock {
@@ -169,11 +168,12 @@ pub struct Query {
     pub query_id: String,
     pub block_id: MaybeBlockId,
     pub request: QueryRequest,
+    pub finality: Finality,
 }
 
 impl Query {
-    pub fn new(block_id: MaybeBlockId, request: QueryRequest) -> Self {
-        Query { query_id: generate_random_string(10), block_id, request }
+    pub fn new(block_id: MaybeBlockId, request: QueryRequest, finality: Finality) -> Self {
+        Query { query_id: generate_random_string(10), block_id, request, finality }
     }
 }
 

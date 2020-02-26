@@ -5,8 +5,7 @@ use std::hash::{Hash, Hasher};
 use std::io::{Error, ErrorKind, Read, Write};
 
 use borsh::{BorshDeserialize, BorshSerialize};
-use rand::rngs::{OsRng, StdRng};
-use rand::SeedableRng;
+use rand_core::OsRng;
 use serde_derive::{Deserialize, Serialize};
 
 use lazy_static::lazy_static;
@@ -147,6 +146,13 @@ impl PublicKey {
         match self {
             PublicKey::ED25519(_) => KeyType::ED25519,
             PublicKey::SECP256K1(_) => KeyType::SECP256K1,
+        }
+    }
+
+    pub fn unwrap_as_ed25519(&self) -> &ED25519PublicKey {
+        match self {
+            PublicKey::ED25519(key) => &key,
+            PublicKey::SECP256K1(_) => panic!(),
         }
     }
 }
@@ -325,14 +331,13 @@ impl SecretKey {
     }
 
     pub fn from_random(key_type: KeyType) -> SecretKey {
-        let mut rng = StdRng::from_rng(OsRng::default()).unwrap();
         match key_type {
             KeyType::ED25519 => {
-                let keypair = ed25519_dalek::Keypair::generate(&mut rng);
+                let keypair = ed25519_dalek::Keypair::generate(&mut OsRng);
                 SecretKey::ED25519(ED25519SecretKey(keypair.to_bytes()))
             }
             KeyType::SECP256K1 => {
-                SecretKey::SECP256K1(secp256k1::key::SecretKey::new(&SECP256K1, &mut rng))
+                SecretKey::SECP256K1(secp256k1::key::SecretKey::new(&SECP256K1, &mut OsRng))
             }
         }
     }
@@ -373,6 +378,13 @@ impl SecretKey {
                 public_key.0.copy_from_slice(&serialized[1..65]);
                 PublicKey::SECP256K1(public_key)
             }
+        }
+    }
+
+    pub fn unwrap_as_ed25519(&self) -> &ED25519SecretKey {
+        match self {
+            SecretKey::ED25519(key) => &key,
+            SecretKey::SECP256K1(_) => panic!(),
         }
     }
 }

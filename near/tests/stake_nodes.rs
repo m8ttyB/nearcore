@@ -18,7 +18,7 @@ use near_primitives::hash::CryptoHash;
 use near_primitives::test_utils::{heavy_test, init_integration_logger};
 use near_primitives::transaction::SignedTransaction;
 use near_primitives::types::{AccountId, BlockHeightDelta, NumSeats};
-use near_primitives::views::{QueryRequest, QueryResponseKind, ValidatorInfo};
+use near_primitives::views::{Finality, QueryRequest, QueryResponseKind, ValidatorInfo};
 use testlib::genesis_hash;
 
 #[derive(Clone)]
@@ -220,6 +220,7 @@ fn test_validator_kickout() {
                                                     .account_id
                                                     .clone(),
                                             },
+                                            Finality::None,
                                         ))
                                         .then(move |res| {
                                             match res.unwrap().unwrap().unwrap().kind {
@@ -249,6 +250,7 @@ fn test_validator_kickout() {
                                                     .account_id
                                                     .clone(),
                                             },
+                                            Finality::None,
                                         ))
                                         .then(move |res| {
                                             match res.unwrap().unwrap().unwrap().kind {
@@ -366,6 +368,7 @@ fn test_validator_join() {
                                         QueryRequest::ViewAccount {
                                             account_id: test_nodes[1].account_id.clone(),
                                         },
+                                        Finality::None,
                                     ))
                                     .then(move |res| match res.unwrap().unwrap().unwrap().kind {
                                         QueryResponseKind::ViewAccount(result) => {
@@ -385,6 +388,7 @@ fn test_validator_join() {
                                         QueryRequest::ViewAccount {
                                             account_id: test_nodes[2].account_id.clone(),
                                         },
+                                        Finality::None,
                                     ))
                                     .then(move |res| match res.unwrap().unwrap().unwrap().kind {
                                         QueryResponseKind::ViewAccount(result) => {
@@ -440,28 +444,38 @@ fn test_inflation() {
         WaitOrTimeout::new(
             Box::new(move |_ctx| {
                 let (done1_copy2, done2_copy2) = (done1_copy1.clone(), done2_copy1.clone());
-                actix::spawn(test_nodes[0].view_client.send(GetBlock::Best).then(move |res| {
-                    let header_view = res.unwrap().unwrap().header;
-                    if header_view.height >= 2 && header_view.height <= epoch_length {
-                        if header_view.total_supply == initial_total_supply {
-                            done1_copy2.store(true, Ordering::SeqCst);
-                        }
-                    }
-                    future::ready(())
-                }));
-                actix::spawn(test_nodes[0].view_client.send(GetBlock::Best).then(move |res| {
-                    let header_view = res.unwrap().unwrap().header;
-                    if header_view.height > epoch_length && header_view.height < epoch_length * 2 {
-                        let inflation = initial_total_supply
-                            * max_inflation_rate as u128
-                            * epoch_length as u128
-                            / (100 * num_blocks_per_year as u128);
-                        if header_view.total_supply == initial_total_supply + inflation {
-                            done2_copy2.store(true, Ordering::SeqCst);
-                        }
-                    }
-                    future::ready(())
-                }));
+                actix::spawn(
+                    test_nodes[0].view_client.send(GetBlock::Finality(Finality::None)).then(
+                        move |res| {
+                            let header_view = res.unwrap().unwrap().header;
+                            if header_view.height >= 2 && header_view.height <= epoch_length {
+                                if header_view.total_supply == initial_total_supply {
+                                    done1_copy2.store(true, Ordering::SeqCst);
+                                }
+                            }
+                            future::ready(())
+                        },
+                    ),
+                );
+                actix::spawn(
+                    test_nodes[0].view_client.send(GetBlock::Finality(Finality::None)).then(
+                        move |res| {
+                            let header_view = res.unwrap().unwrap().header;
+                            if header_view.height > epoch_length
+                                && header_view.height < epoch_length * 2
+                            {
+                                let inflation = initial_total_supply
+                                    * max_inflation_rate as u128
+                                    * epoch_length as u128
+                                    / (100 * num_blocks_per_year as u128);
+                                if header_view.total_supply == initial_total_supply + inflation {
+                                    done2_copy2.store(true, Ordering::SeqCst);
+                                }
+                            }
+                            future::ready(())
+                        },
+                    ),
+                );
                 if done1_copy1.load(Ordering::SeqCst) && done2_copy1.load(Ordering::SeqCst) {
                     System::current().stop();
                 }

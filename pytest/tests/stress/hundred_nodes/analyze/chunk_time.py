@@ -2,13 +2,15 @@ import datetime
 
 chunk_produced = {}
 chunk_sent = {}
-chunk_received = [{} for _ in range(100)]
-chunk_all_parts = [{} for _ in range(100)]
-chunk_can_reconstruct = [{} for _ in range(100)]
+num_nodes = 40
+chunk_received = [{} for _ in range(num_nodes)]
+chunk_all_parts = [{} for _ in range(num_nodes)]
+chunk_can_reconstruct = [{} for _ in range(num_nodes)]
+
 
 producer = 0
-date = '20200211'
-with open(f'tmp/near/collected_logs_{date}/pytest-node-bo-{producer}.txt') as f:
+date = '20200226'
+with open(f'collected_logs_{date}/pytest-node-bowenwang-{producer}.txt') as f:
     for l in f:
         if 'Produced chunk' in l:
             t = l.split(' ')[2]
@@ -22,11 +24,11 @@ with open(f'tmp/near/collected_logs_{date}/pytest-node-bo-{producer}.txt') as f:
                 # they're within 1ms (cannot see difference in ms log) and okay to use
                 # the first chunk_sent time
                 chunk_sent[h] = t
-for i in range(100):
+for i in range(num_nodes):
     if i == producer:
         continue
 
-    with open(f'tmp/near/collected_logs_{date}/pytest-node-bo-{i}.txt') as f:
+    with open(f'collected_logs_{date}/pytest-node-bowenwang-{i}.txt') as f:
         for l in f:
             if 'not care shard' in l:
                 t = l.split(' ')[2]
@@ -50,17 +52,23 @@ for i in range(100):
                     chunk_received[i][h] = t
 
 total_diff = datetime.timedelta(0)
+num_chunks = 0
 for c in chunk_produced:
     print(f'--- chunk {c}')
     print(f'produced at {chunk_produced[c]}')
     if c in chunk_sent:
         print(f'sent at {chunk_sent[c]}')
-    max_received = max([chunk_received[i][c] for i in range(100) if c in chunk_received[i]])
-    total_diff += datetime.datetime.strptime(max_received, '%H:%M:%S.%f') - datetime.datetime.strptime(chunk_produced[c], '%H:%M:%S.%f')
+    try:
+        max_received = max([chunk_received[i][c] for i in range(num_nodes) if c in chunk_received[i]])
+        total_diff += datetime.datetime.strptime(max_received, '%H:%M:%S.%f') - datetime.datetime.strptime(chunk_produced[c], '%H:%M:%S.%f')
 
-    print(f'max time received {max([chunk_received[i][c] for i in range(100) if c in chunk_received[i]])}')
+        print(f'max time received {max([chunk_received[i][c] for i in range(num_nodes) if c in chunk_received[i]])}')
+        num_chunks += 1
+    except:
+        continue
 
-print(total_diff / len(chunk_produced))
+print(f'num chunks {num_chunks} chunks produced {len(chunk_produced)}')
+print(total_diff / num_chunks)
     #for i in range(100):
     #    if i == producer:
     #        continue
